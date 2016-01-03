@@ -1,0 +1,25 @@
+# Dependencies
+markdown:         redcarpet
+redcarpet:
+  extensions: ["no_intra_emphasis", "fenced_code_blocks", "autolink", "strikethrough", "superscript", "tables"]
+highlighter:      pygments
+
+# Permalinks
+permalink:        pretty
+
+# Setup
+title:            Imutável
+tagline:          'A única coisa a lamentar é a estagnação (adaptado de Miyamoto Musashi)'
+description:      'Escrito por Felipe B. Valio' 
+# url:              http://invariante.com
+baseurl:          ''
+author:
+  name: Felipe Braunger Valio
+  # email: feed@invariante.com
+
+paginate:         1
+
+github:
+  # repo:           https://github.com/appsterdambr/invariante
+
+gems: [jekyll-paginate]
