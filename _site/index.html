@@ -63,9 +63,9 @@
     
     
       
+      
+      
     
-      
-      
       
     
       
@@ -78,11 +78,6 @@
     
 
     <ul class="posts">  
-          
-           <li>  
-               <a href="/jekyll/2015/12/10/mvc-de-mentirinha-do-cocoa/">  
-               O MVC de Mentirinha do Cocoa</a>  
-           </li>  
           
            <li>  
                <a href="/jekyll/2015/10/29/testes-assincronos/">  
@@ -100,7 +95,7 @@
 
   <div class="sidebar-item">
     <p>
-      &copy; 2015. All rights reserved.
+      &copy; 2016. All rights reserved.
     </p>
   </div>
 </div>
@@ -123,32 +118,75 @@
   
   <div class="post">
     <h1 class="post-title">
-      <a href="/jekyll/2015/12/10/mvc-de-mentirinha-do-cocoa/">
-        O MVC de Mentirinha do Cocoa
+      <a href="/jekyll/2015/10/29/testes-assincronos/">
+        Testes Assíncronos
       </a>
     </h1>
 
-    <span class="post-date">10 Dec 2015</span>
+    <span class="post-date">29 Oct 2015</span>
 
-    <p>Apesar da Apple afirmar que Cocoa segue o padrão MVC, isso não é inteiramente verdade. Há quem afirme que foi criada uma variação, M/VC, pois as camadas view e controller foram fundidos em uma só, o view-controller. Ao mesmo tempo, alguns defendem que esta variação é na verdade um MVVC (Model-View-ViewController), pois ainda existe a camada de visão, porém magra, enquanto o view-controller é um controller que assume parte das funções da view.</p>
+    <p>Testes unitários precisam ser executados rapidamente, mas eventualmente é necessário realizar um teste assíncrono</p>
 
-<p>Independente de como nomeemos o padrão seguido por Cocoa, um aspecto é unânime: view-controllers são extremamente inchados. Se seguirmos a implementação de um UIViewController da forma tradicional, como as próprias documetações da Apple sugerem, teremos algo mais ou menos assim:</p>
+<p>Imagine o seguinte teste:</p>
 
-<hr>
+<figure class="highlight"><pre><code class="language-swift" data-lang="swift"><span class="k">func</span> <span class="nf">testAsynchronous</span><span class="p">()</span> <span class="p">{</span>
+    <span class="k">var</span> <span class="n">finished</span> <span class="o">=</span> <span class="nb">false</span>
+    
+    <span class="n">dispatch_after</span><span class="p">(</span><span class="n">dispatch_time</span><span class="p">(</span><span class="n">DISPATCH_TIME_NOW</span><span class="p">,</span> <span class="n">Int64</span><span class="p">(</span><span class="mi">1</span> <span class="o">*</span> <span class="n">Double</span><span class="p">(</span><span class="n">NSEC_PER_SEC</span><span class="p">))),</span> <span class="n">dispatch_get_main_queue</span><span class="p">(),</span> <span class="p">{</span>
+        <span class="n">finished</span> <span class="o">=</span> <span class="nb">true</span>
+    <span class="p">})</span>
+    
+    <span class="n">XCTAssertTrue</span><span class="p">(</span><span class="n">finished</span><span class="p">)</span>
+<span class="p">}</span></code></pre></figure>
 
-<p>| Visão   |
-|=========|
-| UI      | }
-| Lógica  | }-ViewController
-| Sistema | }
-|=========|
-| Modelo  |</p>
+<p>Ele falhará porque <em>XCTAssertTrue</em> será executado antes da variável <em>finished</em> ser atribuída com <em>true</em>. Podemos resolver este problema com a seguinte função:</p>
 
-<hr>
+<figure class="highlight"><pre><code class="language-swift" data-lang="swift"><span class="k">func</span> <span class="nf">XCTWait</span><span class="p">(</span><span class="k">inout</span> <span class="nl">finished</span><span class="p">:</span> <span class="n">Bool</span><span class="p">,</span> <span class="nl">timeout</span><span class="p">:</span> <span class="n">NSTimeInterval</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">let</span> <span class="n">timeoutDate</span> <span class="o">=</span> <span class="bp">NSDate</span><span class="p">(</span><span class="nl">timeIntervalSinceNow</span><span class="p">:</span> <span class="n">timeout</span><span class="p">)</span>
+    <span class="k">while</span> <span class="o">!</span><span class="n">finished</span> <span class="o">&amp;&amp;</span> <span class="n">timeoutDate</span><span class="p">.</span><span class="n">earlierDate</span><span class="p">(</span><span class="bp">NSDate</span><span class="p">())</span> <span class="o">!=</span> <span class="n">timeoutDate</span> <span class="p">{</span>
+        <span class="bp">NSRunLoop</span><span class="p">.</span><span class="n">currentRunLoop</span><span class="p">().</span><span class="n">runMode</span><span class="p">(</span><span class="n">NSDefaultRunLoopMode</span><span class="p">,</span> <span class="nl">beforeDate</span><span class="p">:</span> <span class="n">timeoutDate</span><span class="p">)</span>
+    <span class="p">}</span>
+    <span class="n">XCTAssertTrue</span><span class="p">(</span><span class="n">finished</span><span class="p">,</span> <span class="s">&quot;Test should complete in time.&quot;</span><span class="p">)</span>
+<span class="p">}</span></code></pre></figure>
 
-<p>Ou seja, um controller que assume várias tarefas. Uma delas, a de lógica, é a única que ele deveria conter. No entanto, ele também possui código para manipular a interface, confgurando cores, tamanhos, animações etc. Por sistema, entenda como código dependente de hardware, como tipo de aparelho (iPhone, iPad), tamanho de tela ou versão do iOS.</p>
+<p>Que será utilizada da seguinte forma:</p>
 
-<p>Até aí, podemos resolver o problema de view-controllers grandes apenas com boas práticas de programação, como criar componentes ou delegar tarefas para classes menores. Mas isso não nos ajuda se desejamos escrever testes automatizados para um view-controller. Se, por exemplo, tivermos uma lógica específica para o iPhone e outra para o iPad, como escreveremos testes para cada um sem termos que executar os testes uma vez no iPhone e outra no iPad?</p>
+<figure class="highlight"><pre><code class="language-swift" data-lang="swift"><span class="k">func</span> <span class="nf">testAsynchronous</span><span class="p">()</span> <span class="p">{</span>
+    <span class="k">var</span> <span class="n">finished</span> <span class="o">=</span> <span class="nb">false</span>
+    
+    <span class="n">dispatch_after</span><span class="p">(</span><span class="n">dispatch_time</span><span class="p">(</span><span class="n">DISPATCH_TIME_NOW</span><span class="p">,</span> <span class="n">Int64</span><span class="p">(</span><span class="mi">1</span> <span class="o">*</span> <span class="n">Double</span><span class="p">(</span><span class="n">NSEC_PER_SEC</span><span class="p">))),</span> <span class="n">dispatch_get_main_queue</span><span class="p">(),</span> <span class="p">{</span>
+        <span class="n">finished</span> <span class="o">=</span> <span class="nb">true</span>
+    <span class="p">})</span>
+    
+    <span class="n">XCTWait</span><span class="p">(</span><span class="o">&amp;</span><span class="n">finished</span><span class="p">,</span> <span class="nl">timeout</span><span class="p">:</span> <span class="mi">3</span><span class="p">)</span>
+<span class="p">}</span></code></pre></figure>
+
+<p>Este teste concluirá com sucesso após 1 segundo, que é quando <em>finished</em> será atribuído com <em>true</em>. Caso essa atribuição não ocorra, o teste falhará depois de 3 segundos.</p>
+
+<p>Mas e em Objective-C, como fica? Vamos construir uma função semelhante, porém com algumas peculiaridades:</p>
+
+<figure class="highlight"><pre><code class="language-swift" data-lang="swift"><span class="cp">#define XCTWait(finished, timeout) \</span>
+<span class="cp">waitFor(&amp;finished, timeout); \</span>
+<span class="cp">XCTAssertTrue(finished, @&quot;Test should complete in time.&quot;);</span>
+
+<span class="kt">void</span> <span class="nf">waitFor</span><span class="p">(</span><span class="kt">BOOL</span> <span class="o">*</span><span class="n">finished</span><span class="p">,</span> <span class="n">NSTimeInterval</span> <span class="n">timeout</span><span class="p">)</span> <span class="p">{</span>
+    <span class="bp">NSDate</span> <span class="o">*</span><span class="n">timeoutDate</span> <span class="o">=</span> <span class="p">[</span><span class="bp">NSDate</span> <span class="nl">dateWithTimeIntervalSinceNow</span><span class="p">:</span><span class="n">timeout</span><span class="p">];</span>
+    <span class="k">while</span> <span class="p">(</span><span class="o">!*</span><span class="n">finished</span> <span class="o">&amp;&amp;</span> <span class="p">[</span><span class="n">timeoutDate</span> <span class="nl">earlierDate</span><span class="p">:[</span><span class="bp">NSDate</span> <span class="n">date</span><span class="p">]]</span> <span class="o">!=</span> <span class="n">timeoutDate</span><span class="p">)</span> <span class="p">{</span>
+        <span class="p">[[</span><span class="bp">NSRunLoop</span> <span class="n">currentRunLoop</span><span class="p">]</span> <span class="nl">runMode</span><span class="p">:</span><span class="n">NSDefaultRunLoopMode</span> <span class="nl">beforeDate</span><span class="p">:</span><span class="n">timeoutDate</span><span class="p">];</span>
+    <span class="p">}</span>
+<span class="p">}</span></code></pre></figure>
+
+<p>Que, por fim, será utilizado no teste da seguinte maneira:</p>
+
+<figure class="highlight"><pre><code class="language-swift" data-lang="swift"><span class="p">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">testAsynchronous</span> <span class="p">{</span>
+    <span class="k">__block</span> <span class="kt">BOOL</span> <span class="n">finished</span> <span class="o">=</span> <span class="nb">NO</span><span class="p">;</span>
+    
+    <span class="n">dispatch_after</span><span class="p">(</span><span class="n">dispatch_time</span><span class="p">(</span><span class="n">DISPATCH_TIME_NOW</span><span class="p">,</span> <span class="mi">1</span> <span class="o">*</span> <span class="n">NSEC_PER_SEC</span><span class="p">),</span> <span class="n">dispatch_get_main_queue</span><span class="p">(),</span> <span class="o">^</span><span class="p">{</span>
+        <span class="n">finished</span> <span class="o">=</span> <span class="nb">YES</span><span class="p">;</span>
+    <span class="p">});</span>
+    
+    <span class="n">XCTWait</span><span class="p">(</span><span class="n">finished</span><span class="p">,</span> <span class="mi">3</span><span class="p">);</span>
+<span class="p">}</span></code></pre></figure>
 
   </div>
   
